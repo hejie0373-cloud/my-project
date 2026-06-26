@@ -1,0 +1,215 @@
+app:
+  name: "CI/CD 部署通知"
+  description: "接收 GitHub Actions 部署事件，生成中文通知消息，评估优先级"
+  icon: "\U0001F680"
+  icon_type: emoji
+  icon_background: "#E4E4F5"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.6.0"
+dependencies:
+  - type: model_provider
+    value: deepseek
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: code
+        id: edge-start-code
+        source: "1000001"
+        sourceHandle: source
+        target: "1000002"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          sourceType: code
+          targetType: llm
+        id: edge-code-llm
+        source: "1000002"
+        sourceHandle: source
+        target: "1000003"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: end
+        id: edge-llm-end
+        source: "1000003"
+        sourceHandle: source
+        target: "1000004"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+    nodes:
+      - data:
+          title: "接收部署事件"
+          type: start
+          variables:
+            - label: "事件类型"
+              variable: event
+              type: text-input
+              required: true
+              max_length: 50
+            - label: "仓库名"
+              variable: repo
+              type: text-input
+              required: true
+              max_length: 100
+            - label: "分支"
+              variable: branch
+              type: text-input
+              required: true
+              max_length: 50
+            - label: "提交SHA"
+              variable: commit
+              type: text-input
+              required: true
+              max_length: 50
+            - label: "操作人"
+              variable: actor
+              type: text-input
+              required: true
+              max_length: 50
+            - label: "错误信息"
+              variable: error
+              type: paragraph
+              required: false
+              max_length: 1000
+            - label: "时间戳"
+              variable: timestamp
+              type: text-input
+              required: true
+              max_length: 30
+        height: 120
+        id: "1000001"
+        position: { x: 30, y: 300 }
+        positionAbsolute: { x: 30, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          title: "映射事件图标和优先级"
+          type: code
+          code_language: python3
+          code: |
+            def main(event: str, error: str) -> dict:
+                emoji_map = {
+                    "deploy_started": "\U0001F680",
+                    "test_passed": "\U00002705",
+                    "test_failed": "\U0000274C",
+                    "deploy_success": "\U0001F389",
+                    "deploy_failed": "\U0001F525",
+                }
+                emoji = emoji_map.get(event, "\U0001F4E2")
+                priority = "high" if "failed" in event else ("normal" if "started" in event else "low")
+                return {
+                    "event_emoji": emoji,
+                    "priority": priority,
+                    "event_label": event.replace("_", " ").title()
+                }
+          variables:
+            - value_selector: ["1000001", event]
+              variable: event
+            - value_selector: ["1000001", error]
+              variable: error
+          outputs:
+            event_emoji:
+              type: string
+            priority:
+              type: string
+            event_label:
+              type: string
+          selected: false
+        height: 120
+        id: "1000002"
+        position: { x: 334, y: 300 }
+        positionAbsolute: { x: 334, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          title: "生成通知消息"
+          type: llm
+          model:
+            provider: deepseek
+            name: deepseek-chat
+            mode: chat
+            completion_params:
+              temperature: 0.7
+          prompt_template:
+            - id: pt-sys-001
+              role: system
+              text: "你是客留平台的 DevOps 助手。根据部署事件生成简洁通知摘要。失败事件用紧急语气含建议，成功事件用庆贺语气，开始事件用平稳语气。直接输出通知文本，不要任何前缀。"
+            - id: pt-user-001
+              role: user
+              text: "事件: {{#1000001.event#}}\n仓库: {{#1000001.repo#}}\n分支: {{#1000001.branch#}}\n提交: {{#1000001.commit#}}\n操作人: {{#1000001.actor#}}\n时间: {{#1000001.timestamp#}}\n错误: {{#1000001.error#}}\n\n请生成一条简洁的通知摘要（50字以内）。"
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 10
+          vision:
+            enabled: false
+          variables: []
+          selected: false
+        height: 98
+        id: "1000003"
+        position: { x: 638, y: 300 }
+        positionAbsolute: { x: 638, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          title: "输出通知"
+          type: end
+          outputs:
+            - value_selector: ["1000003", text]
+              variable: notification_text
+            - value_selector: ["1000002", priority]
+              variable: priority
+            - value_selector: ["1000002", event_label]
+              variable: event_label
+        height: 90
+        id: "1000004"
+        position: { x: 942, y: 300 }
+        positionAbsolute: { x: 942, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+    viewport: { x: 0, y: 0, zoom: 0.8 }

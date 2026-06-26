@@ -1,0 +1,262 @@
+app:
+  description: "根据客户信息自动生成可直接发送的营销文案"
+  icon: "💬"
+  icon_background: '#FFF8E1'
+  icon_type: emoji
+  mode: workflow
+  name: 营销文案生成器
+kind: app
+version: 0.6.0
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: null
+      version: null
+
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      image: { enabled: false }
+      enabled: false
+    opening_statement: ''
+    retriever_resource: { enabled: false }
+    sensitive_word_avoidance: { enabled: false }
+    speech_to_text: { enabled: false }
+    suggested_questions: []
+    suggested_questions_after_answer: { enabled: false }
+    text_to_speech: { enabled: false }
+
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        position: { x: 30, y: 300 }
+        data:
+          type: start
+          title: 客户信息
+          desc: 系统自动传入，店主不用手动填
+          variables:
+            - label: 店铺名称
+              variable: store_name
+              type: text-input
+              required: true
+              max_length: 100
+            - label: 客户姓名
+              variable: customer_name
+              type: text-input
+              required: true
+              max_length: 50
+            - label: 性别
+              variable: gender
+              type: select
+              required: false
+              options:
+                - value: male
+                  label: 男
+                - value: female
+                  label: 女
+            - label: 上次做了什么项目
+              variable: last_service
+              type: text-input
+              required: true
+              max_length: 100
+            - label: 几天没来了
+              variable: days_ago
+              type: number
+              required: true
+            - label: 累计消费多少元
+              variable: total_spent
+              type: number
+              required: true
+            - label: 用什么方式发
+              variable: channel
+              type: select
+              required: true
+              options:
+                - value: sms
+                  label: 短信
+                - value: email
+                  label: 邮件
+                - value: wechat
+                  label: 微信
+            - label: 为什么发
+              variable: purpose
+              type: select
+              required: true
+              options:
+                - value: reactivation
+                  label: 召回老客
+                - value: promotion
+                  label: 促销活动
+                - value: birthday
+                  label: 生日祝福
+                - value: thanks
+                  label: 感谢回馈
+        height: 120
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+      - id: code
+        type: custom
+        position: { x: 334, y: 300 }
+        data:
+          type: code
+          title: 分析客户画像
+          code_language: python3
+          code: |
+            def main(days_ago: int, total_spent: float, gender: str, channel: str, purpose: str) -> dict:
+                if days_ago <= 14:
+                    activity = "近期才来过，还很活跃"
+                elif days_ago <= 30:
+                    activity = "快一个月没来了，可以关心一下"
+                else:
+                    activity = "很久没来了，需要正式召回"
+
+                if total_spent >= 3000:
+                    value = "消费较高的重要客户"
+                elif total_spent >= 1000:
+                    value = "有一定消费能力的客户"
+                else:
+                    value = "普通消费客户"
+
+                title = "女士" if gender == "female" else "先生"
+
+                length_guide = {
+                    "sms": "70字以内，精简亲切",
+                    "email": "200字左右，正式温馨",
+                    "wechat": "100字左右，口语化可用表情"
+                }.get(channel, "100字以内")
+
+                direction = {
+                    "reactivation": "表达想念 + 专属优惠，吸引回来",
+                    "promotion": "限时活动 + 紧迫感，促成消费",
+                    "birthday": "温馨祝福 + 生日专属福利",
+                    "thanks": "真诚感谢 + 老客特权"
+                }.get(purpose, "友好关心")
+
+                return {
+                    "title": title,
+                    "activity": activity,
+                    "value": value,
+                    "length_guide": length_guide,
+                    "direction": direction,
+                }
+          variables:
+            - variable: days_ago
+              value_selector: [start, days_ago]
+              value_type: number
+            - variable: total_spent
+              value_selector: [start, total_spent]
+              value_type: number
+            - variable: gender
+              value_selector: [start, gender]
+              value_type: string
+            - variable: channel
+              value_selector: [start, channel]
+              value_type: string
+            - variable: purpose
+              value_selector: [start, purpose]
+              value_type: string
+          outputs:
+            title: { type: string }
+            activity: { type: string }
+            value: { type: string }
+            length_guide: { type: string }
+            direction: { type: string }
+        height: 120
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+      - id: llm
+        type: custom
+        position: { x: 638, y: 300 }
+        data:
+          type: llm
+          title: AI 写文案
+          model:
+            provider: langgenius/deepseek/deepseek
+            name: deepseek-chat
+            mode: chat
+            completion_params:
+              max_tokens: 2048
+              temperature: 0.85
+          prompt_template:
+            - id: pt-sys
+              role: system
+              text: "你是小店客服，帮店主写一条发给客户的消息。直接写消息内容，不要加任何解释或标题。"
+            - id: pt-user
+              role: user
+              text: |
+                帮我写一条发给客户的消息。
+
+                店铺：{{#start.store_name#}}
+                客户：{{#start.customer_name#}}{{#code.title#}}
+                上次项目：{{#start.last_service#}}（{{#start.days_ago#}}天前）
+                累计消费：{{#start.total_spent#}}元
+                发送渠道：{{#start.channel#}}
+                发送目的：{{#start.purpose#}}
+
+                客户画像：{{#code.activity#}}，{{#code.value#}}
+                篇幅要求：{{#code.length_guide#}}
+                内容方向：{{#code.direction#}}
+
+                直接写消息正文，不要加"这是为您生成的文案"之类的废话。
+          context: { enabled: false }
+          memory:
+            role_prefix: { user: '', assistant: '' }
+            window: { enabled: false, size: 50 }
+          vision: { enabled: false }
+        height: 98
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+      - id: end
+        type: custom
+        position: { x: 942, y: 300 }
+        data:
+          type: end
+          title: 输出文案
+          outputs:
+            - variable: copy_text
+              value_selector: [llm, text]
+              value_type: string
+        height: 54
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+    edges:
+      - id: edge-start-code
+        source: start
+        target: code
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+        zIndex: 0
+      - id: edge-code-llm
+        source: code
+        target: llm
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data: { sourceType: code, targetType: llm, isInIteration: false, isInLoop: false }
+        zIndex: 0
+      - id: edge-llm-end
+        source: llm
+        target: end
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data: { sourceType: llm, targetType: end, isInIteration: false, isInLoop: false }
+        zIndex: 0

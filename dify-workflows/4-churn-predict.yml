@@ -1,0 +1,241 @@
+app:
+  description: ''
+  icon: "📊"
+  icon_background: '#E8F5E9'
+  icon_type: emoji
+  mode: workflow
+  name: 客户流失预测
+kind: app
+version: 0.6.0
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: null
+      version: null
+
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        position: { x: 30, y: 300 }
+        data:
+          type: start
+          title: 输入客户数据
+          desc: 系统自动传入，不需要店主手动填写
+          variables:
+            - label: 店铺名称
+              variable: store_name
+              type: text-input
+              required: true
+              max_length: 100
+            - label: 客户姓名
+              variable: customer_name
+              type: text-input
+              required: true
+              max_length: 50
+            - label: 累计消费(元)
+              variable: total_spent
+              type: number
+              required: true
+            - label: 来过几次
+              variable: visit_count
+              type: number
+              required: true
+            - label: 上次来是几天前
+              variable: days_ago
+              type: number
+              required: true
+            - label: 最近到店记录
+              variable: visit_history
+              type: paragraph
+              required: true
+              max_length: 10000
+        height: 120
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+      - id: code
+        type: custom
+        position: { x: 334, y: 300 }
+        data:
+          type: code
+          title: 计算风险分
+          code_language: python3
+          code: |
+            def main(days_ago: int, total_spent: float, visit_count: int = 1) -> dict:
+                risk_score = int(days_ago * 1.5)
+                if days_ago > 60:
+                    risk_score += 20
+                elif days_ago > 30:
+                    risk_score += 10
+                risk_score = min(100, risk_score)
+
+                if risk_score >= 65:
+                    level = "高风险"
+                    color = "red"
+                elif risk_score >= 35:
+                    level = "中风险"
+                    color = "yellow"
+                else:
+                    level = "低风险"
+                    color = "green"
+
+                if days_ago <= 0:
+                    days_ago = 1
+                avg_per_visit = total_spent / max(1, visit_count)
+                monthly_freq = max(0.3, 2.5 - (days_ago / 45))
+                annual_value = round(avg_per_visit * monthly_freq * 12, 0)
+
+                return {
+                    "risk_score": risk_score,
+                    "risk_level": level,
+                    "risk_color": color,
+                    "annual_value": annual_value,
+                }
+          variables:
+            - variable: days_ago
+              value_selector: [start, days_ago]
+              value_type: number
+            - variable: total_spent
+              value_selector: [start, total_spent]
+              value_type: number
+            - variable: visit_count
+              value_selector: [start, visit_count]
+              value_type: number
+          outputs:
+            risk_score:
+              type: number
+            risk_level:
+              type: string
+            risk_color:
+              type: string
+            annual_value:
+              type: number
+        height: 120
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+      - id: llm
+        type: custom
+        position: { x: 638, y: 300 }
+        data:
+          type: llm
+          title: AI 分析
+          model:
+            provider: langgenius/deepseek/deepseek
+            name: deepseek-chat
+            mode: chat
+            completion_params:
+              max_tokens: 2048
+              temperature: 0.7
+          prompt_template:
+            - id: pt-sys
+              role: system
+              text: "你是一个帮小店主分析客户的智能助手。店主不是技术人员，你说话要：\n- 简答直白，像朋友聊天一样\n- 只说结论和建议，不要解释你怎么分析的\n- 不要用任何标签（如<think>），不要说\"根据数据显示\"\n- 如果不确定就诚实说"
+            - id: pt-user
+              role: user
+              text: |
+                【店铺】{{#start.store_name#}}
+                【客户】{{#start.customer_name#}}
+                【累计消费】{{#start.total_spent#}}元
+                【来过几次】{{#start.visit_count#}}次
+                【上次来】{{#start.days_ago#}}天前
+                【风险评分】{{#code.risk_score#}}分（满分100）
+                【风险等级】{{#code.risk_level#}}
+                【预计一年消费】{{#code.annual_value#}}元
+                【到店记录】{{#start.visit_history#}}
+
+                请用300字以内回复：
+                1. 一句话总结：这个客户需要赶紧联系吗？
+                2. 给店主1-2条现在就能做的事
+                3. 写一条店主可以直接发给客户的短信（70字以内，带称呼）
+                4. 不要分析过程，直接说结论
+          context:
+            enabled: false
+          memory:
+            role_prefix: { user: '', assistant: '' }
+            window: { enabled: false, size: 50 }
+          vision:
+            enabled: false
+        height: 98
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+      - id: end
+        type: custom
+        position: { x: 942, y: 300 }
+        data:
+          type: end
+          title: 输出结果
+          outputs:
+            - variable: risk_score
+              value_selector: [code, risk_score]
+              value_type: number
+            - variable: risk_level
+              value_selector: [code, risk_level]
+              value_type: string
+            - variable: annual_value
+              value_selector: [code, annual_value]
+              value_type: number
+            - variable: report
+              value_selector: [llm, text]
+              value_type: string
+        height: 54
+        width: 244
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+
+    edges:
+      - id: edge-start-code
+        source: start
+        target: code
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+        zIndex: 0
+      - id: edge-code-llm
+        source: code
+        target: llm
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data: { sourceType: code, targetType: llm, isInIteration: false, isInLoop: false }
+        zIndex: 0
+      - id: edge-llm-end
+        source: llm
+        target: end
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data: { sourceType: llm, targetType: end, isInIteration: false, isInLoop: false }
+        zIndex: 0

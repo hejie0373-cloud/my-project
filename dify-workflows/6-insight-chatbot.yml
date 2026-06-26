@@ -1,0 +1,183 @@
+app:
+  name: "业务洞察对话机器人"
+  description: "面向店主和店员的智能问答助手，支持查询客户数据、获取经营建议、了解运营指标"
+  icon: "\U0001F916"
+  icon_type: emoji
+  icon_background: "#E3F2FD"
+  mode: advanced-chat
+  use_icon_as_answer_icon: true
+kind: app
+version: "0.6.0"
+dependencies:
+  - type: model_provider
+    value: deepseek
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+      enabled: false
+    opening_statement: "你好！我是客留的业务洞察助手。我可以帮你分析客户数据、提供经营建议、解读运营指标。请问有什么需要了解的？"
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - "最近一周哪些客户有流失风险？"
+      - "本月销售额趋势怎么样？"
+      - "如何提升老客户的复购率？"
+      - "帮我生成一条针对沉睡客户的召回文案"
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: knowledge-retrieval
+        id: edge-start-retrieval
+        source: "1000001"
+        sourceHandle: source
+        target: "1000002"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          sourceType: knowledge-retrieval
+          targetType: llm
+        id: edge-retrieval-llm
+        source: "1000002"
+        sourceHandle: source
+        target: "1000003"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: answer
+        id: edge-llm-answer
+        source: "1000003"
+        sourceHandle: source
+        target: "1000004"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+    nodes:
+      - data:
+          title: "开始"
+          type: start
+        height: 54
+        id: "1000001"
+        position: { x: 30, y: 300 }
+        positionAbsolute: { x: 30, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          title: "知识检索"
+          type: knowledge-retrieval
+          dataset_ids: []
+          retrieval_mode: multiple
+          single_dataset:
+            retrieval_model:
+              method: semantic_search
+              reranking_enable: true
+              reranking_model:
+                reranking_provider: ""
+                reranking_model_name: ""
+              top_k: 5
+              score_threshold_enabled: false
+              score_threshold: 0.5
+              multiple_retrieval_config:
+                ranking_type: weighted_average
+                reranking_enable: true
+                reranking_model:
+                  reranking_provider: ""
+                  reranking_model_name: ""
+                top_k: 5
+                score_threshold:
+                  enable: false
+                  value: 0.5
+          query_variable_selector:
+            - sys
+            - query
+          vision:
+            enabled: false
+          selected: false
+        height: 98
+        id: "1000002"
+        position: { x: 280, y: 300 }
+        positionAbsolute: { x: 280, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          title: "智能回答"
+          type: llm
+          model:
+            provider: deepseek
+            name: deepseek-chat
+            mode: chat
+            completion_params:
+              temperature: 0.7
+          prompt_template:
+            - id: pt-sys-006
+              role: system
+              text: "你是「客留」平台的业务洞察助手，服务于线下小店店主和店员。\n\n你的能力范围：\n1. 分析客户流失风险和复购行为\n2. 解读销售数据和经营指标\n3. 提供客户维系和营销策略建议\n4. 生成个性化跟进文案\n\n回答原则：\n- 使用简洁易懂的中文，避免专业术语堆砌\n- 数据类问题给出具体的数字和分析结论\n- 建议类问题给出可执行的步骤（1-2-3编号）\n- 如果涉及敏感商业决策，提醒用户结合自身实际情况判断\n- 如果问题超出你的知识范围，诚实说明并建议咨询专业人士"
+            - id: pt-user-006
+              role: user
+              text: |
+                用户提问：{{#sys.query#}}
+
+                {{#1000002.context#}}
+
+                请根据以上信息回答用户的问题。
+          context:
+            enabled: true
+            variable_selector:
+              - "1000002"
+              - context
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: true
+              size: 10
+          vision:
+            enabled: false
+          variables: []
+          selected: false
+        height: 98
+        id: "1000003"
+        position: { x: 530, y: 300 }
+        positionAbsolute: { x: 530, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          title: "回复"
+          type: answer
+          answer: "{{#1000003.text#}}"
+          variables: []
+        height: 54
+        id: "1000004"
+        position: { x: 780, y: 300 }
+        positionAbsolute: { x: 780, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+    viewport: { x: 0, y: 0, zoom: 0.8 }

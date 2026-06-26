@@ -1,0 +1,78 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+env:
+  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Syntax check
+        run: python -m py_compile backend/app/**/*.py
+      - name: Notify test result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            curl -s -X POST $WEBHOOK_URL/webhooks/deploy \
+              -H "Content-Type: application/json" \
+              -d '{"event":"test_passed","repo":"keliu","branch":"main","commit":"${{ github.sha }}","actor":"${{ github.actor }}"}'
+          else
+            curl -s -X POST $WEBHOOK_URL/webhooks/deploy \
+              -H "Content-Type: application/json" \
+              -d '{"event":"test_failed","repo":"keliu","branch":"main","commit":"${{ github.sha }}","actor":"${{ github.actor }}","error":"Tests failed"}'
+          fi
+
+  build-and-deploy:
+    needs: test-backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Notify deploy started
+        run: |
+          curl -s -X POST $WEBHOOK_URL/webhooks/deploy \
+            -H "Content-Type: application/json" \
+            -d '{"event":"deploy_started","repo":"keliu","branch":"main","commit":"${{ github.sha }}","actor":"${{ github.actor }}"}'
+
+      - name: Build backend image
+        run: docker build -t keliu-backend:latest ./backend
+
+      - name: Build frontend image
+        run: docker build -t keliu-frontend:latest ./frontend
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/keliu
+            git pull origin main
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+            docker image prune -f
+
+      - name: Notify deploy result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            curl -s -X POST $WEBHOOK_URL/webhooks/deploy \
+              -H "Content-Type: application/json" \
+              -d '{"event":"deploy_success","repo":"keliu","branch":"main","commit":"${{ github.sha }}","actor":"${{ github.actor }}"}'
+          else
+            curl -s -X POST $WEBHOOK_URL/webhooks/deploy \
+              -H "Content-Type: application/json" \
+              -d '{"event":"deploy_failed","repo":"keliu","branch":"main","commit":"${{ github.sha }}","actor":"${{ github.actor }}","error":"${{ job.status }}"}'
+          fi

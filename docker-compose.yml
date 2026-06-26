@@ -1,0 +1,132 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: keliu-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: keliu123
+      MYSQL_DATABASE: keliudb
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pkeliu123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - keliu-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: keliu-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - keliu-network
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: keliu-es
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - keliu-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: keliu-backend
+    ports:
+      - "8009:8009"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_URL=mysql+aiomysql://root:keliu123@mysql:3306/keliudb
+      - REDIS_URL=redis://redis:6379/0
+      - ES_URL=http://elasticsearch:9200
+      - DIFY_API_URL=http://docker-api-1:5001
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8009 --reload
+    networks:
+      - keliu-network
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: keliu-celery
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_URL=mysql+aiomysql://root:keliu123@mysql:3306/keliudb
+      - REDIS_URL=redis://redis:6379/0
+      - ES_URL=http://elasticsearch:9200
+    env_file:
+      - ./backend/.env
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    networks:
+      - keliu-network
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: keliu-celery-beat
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_URL=mysql+aiomysql://root:keliu123@mysql:3306/keliudb
+      - REDIS_URL=redis://redis:6379/0
+      - ES_URL=http://elasticsearch:9200
+    env_file:
+      - ./backend/.env
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    networks:
+      - keliu-network
+
+volumes:
+  mysql_data:
+  es_data:
+
+networks:
+  keliu-network:
+    driver: bridge

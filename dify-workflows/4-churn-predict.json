@@ -1,0 +1,370 @@
+{
+  "app": {
+    "description": "",
+    "icon": "📊",
+    "icon_background": "#E8F5E9",
+    "icon_type": "emoji",
+    "mode": "workflow",
+    "name": "客户流失预测",
+    "use_icon_as_answer_icon": false
+  },
+  "dependencies": [
+    {
+      "current_identifier": null,
+      "type": "marketplace",
+      "value": {
+        "marketplace_plugin_unique_identifier": null,
+        "version": null
+      }
+    }
+  ],
+  "kind": "app",
+  "version": "0.6.0",
+  "workflow": {
+    "conversation_variables": [],
+    "environment_variables": [],
+    "features": {
+      "file_upload": {
+        "allowed_file_extensions": [
+          ".JPG",
+          ".JPEG",
+          ".PNG",
+          ".GIF",
+          ".WEBP"
+        ],
+        "allowed_file_types": [
+          "image"
+        ],
+        "allowed_file_upload_methods": [
+          "local_file",
+          "remote_url"
+        ],
+        "enabled": false,
+        "fileUploadConfig": {
+          "attachment_image_file_size_limit": 2,
+          "audio_file_size_limit": 50,
+          "batch_count_limit": 5,
+          "file_size_limit": 15,
+          "file_upload_limit": 20,
+          "image_file_batch_limit": 10,
+          "image_file_size_limit": 10,
+          "single_chunk_attachment_limit": 10,
+          "video_file_size_limit": 100,
+          "workflow_file_upload_limit": 10
+        },
+        "image": {
+          "enabled": false,
+          "number_limits": 3,
+          "transfer_methods": [
+            "local_file",
+            "remote_url"
+          ]
+        },
+        "number_limits": 3
+      },
+      "opening_statement": "",
+      "retriever_resource": {
+        "enabled": false
+      },
+      "sensitive_word_avoidance": {
+        "enabled": false
+      },
+      "speech_to_text": {
+        "enabled": false
+      },
+      "suggested_questions": [],
+      "suggested_questions_after_answer": {
+        "enabled": false
+      },
+      "text_to_speech": {
+        "enabled": false,
+        "language": "",
+        "voice": ""
+      }
+    },
+    "graph": {
+      "edges": [
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "start",
+            "targetType": "code"
+          },
+          "id": "edge-start-code",
+          "source": "1000001",
+          "sourceHandle": "source",
+          "target": "1000002",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "llm"
+          },
+          "id": "edge-code-llm",
+          "source": "1000002",
+          "sourceHandle": "source",
+          "target": "1000003",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "llm",
+            "targetType": "end"
+          },
+          "id": "edge-llm-end",
+          "source": "1000003",
+          "sourceHandle": "source",
+          "target": "1000004",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        }
+      ],
+      "nodes": [
+        {
+          "data": {
+            "desc": "",
+            "selected": false,
+            "title": "输入客户数据",
+            "type": "start",
+            "variables": [
+              {
+                "label": "店铺名称",
+                "variable": "store_name",
+                "type": "text-input",
+                "required": true,
+                "max_length": 100
+              },
+              {
+                "label": "客户姓名",
+                "variable": "customer_name",
+                "type": "text-input",
+                "required": true,
+                "max_length": 50
+              },
+              {
+                "label": "到店记录(JSON)",
+                "variable": "visits_json",
+                "type": "paragraph",
+                "required": true,
+                "max_length": 10000
+              },
+              {
+                "label": "消费总额(元)",
+                "variable": "total_spent",
+                "type": "number",
+                "required": true
+              },
+              {
+                "label": "距上次到店天数",
+                "variable": "days_since_last_visit",
+                "type": "number",
+                "required": true
+              }
+            ]
+          },
+          "height": 120,
+          "id": "1000001",
+          "position": {
+            "x": 30,
+            "y": 300
+          },
+          "positionAbsolute": {
+            "x": 30,
+            "y": 300
+          },
+          "selected": false,
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "type": "custom",
+          "width": 244
+        },
+        {
+          "data": {
+            "code": "def main(days_since_last_visit: int, total_spent: float) -> dict:\n    from datetime import datetime\n    \n    # 流失风险评分 (0-100)\n    risk_score = min(100, int(days_since_last_visit * 1.5))\n    if days_since_last_visit > 60:\n        risk_score = min(100, risk_score + 20)\n    elif days_since_last_visit > 30:\n        risk_score = min(100, risk_score + 10)\n    \n    # CLV 粗估 (简化模型)\n    clv_estimate = total_spent * (365 / max(1, days_since_last_visit))\n    \n    # 风险等级判定\n    if risk_score >= 70:\n        risk_level = \"high\"\n    elif risk_score >= 40:\n        risk_level = \"medium\"\n    else:\n        risk_level = \"low\"\n    \n    return {\n        \"risk_score\": risk_score,\n        \"risk_level\": risk_level,\n        \"clv_estimate\": round(clv_estimate, 2),\n        \"days_since_last\": days_since_last_visit\n    }\n",
+            "code_language": "python3",
+            "desc": "",
+            "outputs": {
+              "risk_score": {
+                "type": "number"
+              },
+              "risk_level": {
+                "type": "string"
+              },
+              "clv_estimate": {
+                "type": "number"
+              },
+              "days_since_last": {
+                "type": "number"
+              }
+            },
+            "selected": false,
+            "title": "计算流失风险与CLV",
+            "type": "code",
+            "variables": {
+              "days_since_last_visit": {
+                "type": "number",
+                "value": [
+                  "1000001",
+                  "days_since_last_visit"
+                ]
+              },
+              "total_spent": {
+                "type": "number",
+                "value": [
+                  "1000001",
+                  "total_spent"
+                ]
+              }
+            }
+          },
+          "height": 120,
+          "id": "1000002",
+          "position": {
+            "x": 334,
+            "y": 300
+          },
+          "positionAbsolute": {
+            "x": 334,
+            "y": 300
+          },
+          "selected": false,
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "type": "custom",
+          "width": 244
+        },
+        {
+          "data": {
+            "context": {
+              "enabled": false,
+              "variable_selector": []
+            },
+            "desc": "",
+            "memory": {
+              "role_prefix": {
+                "assistant": "",
+                "user": ""
+              },
+              "window": {
+                "enabled": false,
+                "size": 50
+              }
+            },
+            "model": {
+              "completion_params": {
+                "max_tokens": 2048,
+                "temperature": 0.7
+              },
+              "mode": "chat",
+              "name": "deepseek-chat",
+              "provider": "langgenius/deepseek/deepseek"
+            },
+            "prompt_template": [
+              {
+                "id": "pt-sys-004",
+                "role": "system",
+                "text": "你是客户留存分析师。根据客户数据和风险评分，输出结构化分析：1.当前状态概述 2.流失风险评估 3.CLV价值判断 4.具体跟进建议（含时间窗口） 5.推荐沟通话术（短信/微信风格）。用中文回复。"
+              },
+              {
+                "id": "pt-user-004",
+                "role": "user",
+                "text": "店铺：{{#1000001.store_name#}} 客户：{{#1000001.customer_name#}} 消费总额：{{#1000001.total_spent#}} 元 距上次到店：{{#1000002.days_since_last#}} 天\n--- AI 计算指标 --- 流失风险分：{{#1000002.risk_score#}} / 100 风险等级：{{#1000002.risk_level#}} 估算终身价值(元)：{{#1000002.clv_estimate#}}\n到店记录：{{#1000001.visits_json#}}\n请输出完整流失分析报告。"
+              }
+            ],
+            "selected": false,
+            "title": "生成流失分析与建议",
+            "type": "llm",
+            "variables": [],
+            "vision": {
+              "enabled": false
+            }
+          },
+          "height": 98,
+          "id": "1000003",
+          "position": {
+            "x": 638,
+            "y": 300
+          },
+          "positionAbsolute": {
+            "x": 638,
+            "y": 300
+          },
+          "selected": false,
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "type": "custom",
+          "width": 244
+        },
+        {
+          "data": {
+            "desc": "",
+            "outputs": [
+              {
+                "value_selector": [
+                  "1000003",
+                  "text"
+                ],
+                "variable": "analysis_report"
+              },
+              {
+                "value_selector": [
+                  "1000002",
+                  "risk_score"
+                ],
+                "variable": "risk_score"
+              },
+              {
+                "value_selector": [
+                  "1000002",
+                  "risk_level"
+                ],
+                "variable": "risk_level"
+              },
+              {
+                "value_selector": [
+                  "1000002",
+                  "clv_estimate"
+                ],
+                "variable": "clv_estimate"
+              }
+            ],
+            "selected": false,
+            "title": "输出预测结果",
+            "type": "end"
+          },
+          "height": 90,
+          "id": "1000004",
+          "position": {
+            "x": 942,
+            "y": 300
+          },
+          "positionAbsolute": {
+            "x": 942,
+            "y": 300
+          },
+          "selected": false,
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "type": "custom",
+          "width": 244
+        }
+      ]
+    },
+    "viewport": {
+      "x": -68.84955608234763,
+      "y": -61.00255213225916,
+      "zoom": 1
+    }
+  }
+}

@@ -1,0 +1,92 @@
+﻿/* ============================================================
+   客留 Design Tokens
+   方向：克制、专业、适合高频业务系统使用
+   ============================================================ */
+
+:root {
+  /* ---- Palette (OKLCH) ---- */
+  --ink: oklch(0.15 0.01 250);
+  --ink-muted: oklch(0.40 0.01 250);
+  --surface: oklch(0.99 0.002 250);
+  --bg: oklch(0.96 0.003 250);
+  --border: oklch(0.88 0.005 250);
+
+    /* Accent */
+  --accent: oklch(0.55 0.12 210);
+  --accent-hover: oklch(0.50 0.12 210);
+  --accent-light: oklch(0.90 0.04 210);
+
+  /* Semantic */
+  --danger: oklch(0.52 0.18 25);
+  --danger-light: oklch(0.92 0.05 25);
+  --success: oklch(0.55 0.15 160);
+  --success-light: oklch(0.90 0.05 160);
+  --warning: oklch(0.65 0.16 85);
+  --warning-light: oklch(0.93 0.06 85);
+
+  /* Risk colors */
+  --risk-high: oklch(0.52 0.18 25);
+  --risk-medium: oklch(0.65 0.16 85);
+  --risk-low: oklch(0.55 0.15 160);
+
+  /* ---- Typography ---- */
+  --font-sans: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* ---- Spacing ---- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* ---- Shadow ---- */
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.06);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.08);
+  --shadow-lg: 0 8px 24px oklch(0 0 0 / 0.10);
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.page-container { max-width: 1280px; margin: 0 auto; padding: var(--space-lg); }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-lg); }
+.page-title { font-size: 1.5rem; font-weight: 700; letter-spacing: 0; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-lg); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); margin-bottom: var(--space-lg); }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-lg); }
+.stat-value { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.03em; }
+.stat-label { font-size: 0.875rem; color: var(--ink-muted); margin-top: var(--space-xs); }
+
+.risk-badge { display: inline-flex; align-items: center; gap: var(--space-xs); padding: 2px 10px; border-radius: 100px; font-size: 0.8rem; font-weight: 600; }
+.risk-high { background: var(--danger-light); color: var(--danger); }
+.risk-medium { background: var(--warning-light); color: var(--warning); }
+.risk-low { background: var(--success-light); color: var(--success); }
+
+.empty-state { text-align: center; padding: var(--space-2xl) var(--space-lg); color: var(--ink-muted); }
+.empty-state-icon { font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.4; }
